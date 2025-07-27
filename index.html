@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Генератор статистики голосования</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            backdrop-filter: blur(10px);
+        }
+        
+        .upload-area {
+            border: 3px dashed #4facfe;
+            border-radius: 15px;
+            padding: 40px;
+            text-align: center;
+            margin-bottom: 30px;
+            background: #f8f9ff;
+            transition: all 0.3s ease;
+        }
+        
+        .upload-area:hover {
+            border-color: #00f2fe;
+            background: #e8f4fd;
+        }
+        
+        .upload-area.dragover {
+            border-color: #00f2fe;
+            background: #e8f4fd;
+            transform: scale(1.02);
+        }
+        
+        #fileInput {
+            display: none;
+        }
+        
+        .upload-btn {
+            background: linear-gradient(45deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .upload-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 16px rgba(79, 172, 254, 0.3);
+        }
+        
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+            font-size: 2.2em;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .stats-summary {
+            background: linear-gradient(45deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+            text-align: center;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.1);
+            display: none;
+        }
+        
+        .stats-summary h2 {
+            margin: 0 0 10px 0;
+            font-size: 1.5em;
+        }
+        
+        .stats-summary p {
+            margin: 5px 0;
+            font-size: 1.1em;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            background: white;
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            display: none;
+        }
+        
+        th {
+            background: linear-gradient(45deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+            padding: 18px 12px;
+            text-align: center;
+            font-weight: 600;
+            font-size: 1.1em;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.2);
+        }
+        
+        td {
+            padding: 15px 12px;
+            text-align: center;
+            border-bottom: 1px solid #f0f0f0;
+            font-size: 1em;
+        }
+        
+        tr:nth-child(even) {
+            background-color: #f8f9ff;
+        }
+        
+        tr:hover {
+            background-color: #e8f4fd;
+            transform: scale(1.01);
+            transition: all 0.3s ease;
+        }
+        
+        .entrance-number {
+            font-weight: bold;
+            color: #4facfe;
+            font-size: 1.2em;
+        }
+        
+        .voting-rate {
+            font-weight: bold;
+            color: #28a745;
+        }
+        
+        .non-voting-rate {
+            font-weight: bold;
+            color: #dc3545;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background-color: #e9ecef;
+            border-radius: 10px;
+            overflow: hidden;
+            position: relative;
+        }
+        
+        .progress-voting {
+            height: 100%;
+            background: linear-gradient(90deg, #28a745, #20c997);
+            border-radius: 10px 0 0 10px;
+            transition: width 0.5s ease;
+        }
+        
+        .progress-non-voting {
+            height: 100%;
+            background: linear-gradient(90deg, #dc3545, #fd7e14);
+            border-radius: 0 10px 10px 0;
+            transition: width 0.5s ease;
+        }
+        
+        .apartments-list {
+            max-width: 300px;
+            font-size: 0.8em;
+            color: #666;
+            line-height: 1.3;
+            word-wrap: break-word;
+            padding: 8px;
+            background: #f8f9fa;
+            border-radius: 6px;
+            border: 1px solid #e9ecef;
+        }
+        
+        .conclusions {
+            margin-top: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            border-left: 5px solid #007bff;
+            display: none;
+        }
+        
+        .loading {
+            text-align: center;
+            color: #4facfe;
+            font-size: 1.2em;
+            display: none;
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                padding: 15px;
+            }
+            
+            table {
+                font-size: 0.9em;
+            }
+            
+            th, td {
+                padding: 10px 8px;
+            }
+            
+            .apartments-list {
+                max-width: 250px;
+                font-size: 0.75em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📊 Генератор статистики голосования</h1>
+        
+        <div class="upload-area" id="uploadArea">
+            <h3>Перетащите файл сюда или нажмите для выбора</h3>
+            <p>Поддерживаются файлы .txt</p>
+            <button class="upload-btn" onclick="document.getElementById('fileInput').click()">
+                Выбрать файл
+            </button>
+            <input type="file" id="fileInput" accept=".txt" />
+        </div>
+        
+        <div class="loading" id="loading">
+            Обработка данных...
+        </div>
+        
+        <div class="stats-summary" id="statsSummary">
+            <h2>Общая статистика на <span id="currentDate"></span></h2>
+            <p><strong>Всего квартир:</strong> <span id="totalApartments">599</span></p>
+            <p><strong>Не голосовали:</strong> <span id="nonVotingCount">0</span> квартир</p>
+            <p><strong>Общая явка:</strong> <span id="overallTurnout">0%</span></p>
+        </div>
+        
+        <table id="statisticsTable">
+            <thead>
+                <tr>
+                    <th>Подъезд</th>
+                    <th>Диапазон квартир</th>
+                    <th>Всего квартир</th>
+                    <th>Не голосовали</th>
+                    <th>Явка (%)</th>
+                    <th>Не явились (%)</th>
+                    <th>Визуализация</th>
+                    <th>Квартиры, НЕ ГОЛОСОВАВШИЕ</th>
+                </tr>
+            </thead>
+            <tbody id="tableBody">
+            </tbody>
+        </table>
+        
+        <div class="conclusions" id="conclusions">
+            <h3 style="color: #007bff; margin-top: 0;">📈 Основные выводы:</h3>
+            <div id="conclusionsContent"></div>
+        </div>
+    </div>
+
+    <script>
+        const entrances = {
+            1: { min: 1, max: 57 },
+            2: { min: 58, max: 114 },
+            3: { min: 115, max: 170 },
+            4: { min: 171, max: 206 },
+            5: { min: 207, max: 263 },
+            6: { min: 264, max: 299 },
+            7: { min: 300, max: 356 },
+            8: { min: 357, max: 392 },
+            9: { min: 393, max: 449 },
+            10: { min: 450, max: 506 },
+            11: { min: 507, max: 542 },
+            12: { min: 543, max: 599 }
+        };
+
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const loading = document.getElementById('loading');
+        const statsSummary = document.getElementById('statsSummary');
+        const statisticsTable = document.getElementById('statisticsTable');
+        const conclusions = document.getElementById('conclusions');
+
+        // Set current date
+        function updateCurrentDate() {
+            const now = new Date();
+            const options = { 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric',
+                weekday: 'long'
+            };
+            const dateStr = now.toLocaleDateString('ru-RU', options);
+            document.getElementById('currentDate').textContent = dateStr;
+        }
+
+        // Initialize date on page load
+        updateCurrentDate();
+
+        // Drag and drop handlers
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                processFile(files[0]);
+            }
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                processFile(e.target.files[0]);
+            }
+        });
+
+        function processFile(file) {
+            if (!file.name.endsWith('.txt')) {
+                alert('Пожалуйста, выберите файл .txt');
+                return;
+            }
+
+            loading.style.display = 'block';
+            statsSummary.style.display = 'none';
+            statisticsTable.style.display = 'none';
+            conclusions.style.display = 'none';
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                setTimeout(() => {
+                    processData(e.target.result);
+                    loading.style.display = 'none';
+                }, 500);
+            };
+            reader.readAsText(file, 'utf-8');
+        }
+
+        function processData(fileContent) {
+            const lines = fileContent.trim().split('\n');
+            const apartmentData = {};
+
+            lines.forEach(line => {
+                const cleanLine = line.trim();
+                if (!cleanLine) return;
+                
+                let number, mark = '';
+                if (cleanLine.includes('д')) {
+                    number = parseInt(cleanLine.replace(/\s*д\s*/g, ''));
+                    mark = ' (д)';
+                } else {
+                    number = parseInt(cleanLine);
+                }
+                
+                if (!isNaN(number)) {
+                    if (!apartmentData[number]) {
+                        apartmentData[number] = mark;
+                    } else if (mark && !apartmentData[number].includes('д')) {
+                        apartmentData[number] = mark;
+                    }
+                }
+            });
+
+            const apartmentNumbers = Object.keys(apartmentData).map(num => parseInt(num)).sort((a, b) => a - b);
+
+            // Group apartments by entrance
+            const entranceData = {};
+            for (let i = 1; i <= 12; i++) {
+                entranceData[i] = {
+                    totalApartments: entrances[i].max - entrances[i].min + 1,
+                    nonVotingApartments: [],
+                    nonVotingCount: 0
+                };
+            }
+
+            apartmentNumbers.forEach(apt => {
+                for (let entrance = 1; entrance <= 12; entrance++) {
+                    if (apt >= entrances[entrance].min && apt <= entrances[entrance].max) {
+                        const displayText = apt + apartmentData[apt];
+                        entranceData[entrance].nonVotingApartments.push(displayText);
+                        entranceData[entrance].nonVotingCount++;
+                        break;
+                    }
+                }
+            });
+
+            // Calculate statistics
+            for (let i = 1; i <= 12; i++) {
+                const data = entranceData[i];
+                data.votingRate = ((data.totalApartments - data.nonVotingCount) / data.totalApartments * 100).toFixed(1);
+                data.nonVotingRate = (data.nonVotingCount / data.totalApartments * 100).toFixed(1);
+            }
+
+            const totalApartments = Object.values(entranceData).reduce((sum, data) => sum + data.totalApartments, 0);
+            const totalNonVoting = Object.values(entranceData).reduce((sum, data) => sum + data.nonVotingCount, 0);
+            const overallVotingRate = ((totalApartments - totalNonVoting) / totalApartments * 100).toFixed(1);
+
+            updateDisplay(entranceData, totalApartments, totalNonVoting, overallVotingRate);
+        }
+
+        function updateDisplay(entranceData, totalApartments, totalNonVoting, overallVotingRate) {
+            // Update summary
+            document.getElementById('totalApartments').textContent = totalApartments;
+            document.getElementById('nonVotingCount').textContent = totalNonVoting;
+            document.getElementById('overallTurnout').textContent = overallVotingRate + '%';
+
+            // Update table
+            const tableBody = document.getElementById('tableBody');
+            tableBody.innerHTML = '';
+
+            for (let i = 1; i <= 12; i++) {
+                const data = entranceData[i];
+                const row = document.createElement('tr');
+                
+                row.innerHTML = `
+                    <td class="entrance-number">${i}</td>
+                    <td>${entrances[i].min}-${entrances[i].max}</td>
+                    <td>${data.totalApartments}</td>
+                    <td>${data.nonVotingCount}</td>
+                    <td class="voting-rate">${data.votingRate}%</td>
+                    <td class="non-voting-rate">${data.nonVotingRate}%</td>
+                    <td>
+                        <div class="progress-bar">
+                            <div class="progress-voting" style="width: ${data.votingRate}%; float: left;"></div>
+                            <div class="progress-non-voting" style="width: ${data.nonVotingRate}%; float: right;"></div>
+                        </div>
+                    </td>
+                    <td class="apartments-list">${data.nonVotingApartments.join(', ')}</td>
+                `;
+                
+                tableBody.appendChild(row);
+            }
+
+            // Generate conclusions
+            const sortedByTurnout = Object.entries(entranceData)
+                .map(([entrance, data]) => ({ entrance: parseInt(entrance), turnout: parseFloat(data.votingRate) }))
+                .sort((a, b) => b.turnout - a.turnout);
+
+            const best = sortedByTurnout.slice(0, 3);
+            const worst = sortedByTurnout.slice(-2);
+            const needAttention = sortedByTurnout.filter(item => item.turnout < 40);
+
+            const conclusionsContent = document.getElementById('conclusionsContent');
+            conclusionsContent.innerHTML = `
+                <ul style="color: #666; line-height: 1.6;">
+                    <li><strong>Лучшая явка:</strong> ${best.map(item => `Подъезд ${item.entrance} (${item.turnout}%)`).join(', ')}</li>
+                    <li><strong>Худшая явка:</strong> ${worst.map(item => `Подъезд ${item.entrance} (${item.turnout}%)`).join(', ')}</li>
+                    <li><strong>Средняя явка:</strong> ${overallVotingRate}% по всему дому</li>
+                    ${needAttention.length > 0 ? `<li><strong>Требует внимания:</strong> ${needAttention.map(item => `Подъезд ${item.entrance}`).join(', ')} с явкой менее 40%</li>` : ''}
+                </ul>
+            `;
+
+            // Show results
+            statsSummary.style.display = 'block';
+            statisticsTable.style.display = 'table';
+            conclusions.style.display = 'block';
+        }
+    </script>
+</body>
+</html>
