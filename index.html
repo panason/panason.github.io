@@ -14,7 +14,7 @@
         }
         
         .container {
-            max-width: 1200px;
+            max-width: 1400px;
             margin: 0 auto;
             background: rgba(255, 255, 255, 0.95);
             border-radius: 20px;
@@ -93,6 +93,28 @@
             font-size: 1.1em;
         }
         
+        .format-info {
+            background: #e8f4fd;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            border-left: 4px solid #4facfe;
+        }
+        
+        .format-info h3 {
+            margin-top: 0;
+            color: #2c3e50;
+        }
+        
+        .format-example {
+            font-family: monospace;
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+            margin: 10px 0;
+        }
+        
         table {
             width: 100%;
             border-collapse: collapse;
@@ -107,18 +129,18 @@
         th {
             background: linear-gradient(45deg, #4facfe 0%, #00f2fe 100%);
             color: white;
-            padding: 18px 12px;
+            padding: 15px 8px;
             text-align: center;
             font-weight: 600;
-            font-size: 1.1em;
+            font-size: 0.95em;
             text-shadow: 1px 1px 2px rgba(0,0,0,0.2);
         }
         
         td {
-            padding: 15px 12px;
+            padding: 12px 8px;
             text-align: center;
             border-bottom: 1px solid #f0f0f0;
-            font-size: 1em;
+            font-size: 0.9em;
         }
         
         tr:nth-child(even) {
@@ -147,6 +169,11 @@
             color: #dc3545;
         }
         
+        .no-data-rate {
+            font-weight: bold;
+            color: #ffc107;
+        }
+        
         .progress-bar {
             width: 100%;
             height: 20px;
@@ -154,25 +181,30 @@
             border-radius: 10px;
             overflow: hidden;
             position: relative;
+            display: flex;
         }
         
         .progress-voting {
             height: 100%;
             background: linear-gradient(90deg, #28a745, #20c997);
-            border-radius: 10px 0 0 10px;
             transition: width 0.5s ease;
         }
         
         .progress-non-voting {
             height: 100%;
             background: linear-gradient(90deg, #dc3545, #fd7e14);
-            border-radius: 0 10px 10px 0;
+            transition: width 0.5s ease;
+        }
+        
+        .progress-no-data {
+            height: 100%;
+            background: linear-gradient(90deg, #ffc107, #fd7e14);
             transition: width 0.5s ease;
         }
         
         .apartments-list {
-            max-width: 300px;
-            font-size: 0.8em;
+            max-width: 200px;
+            font-size: 0.75em;
             color: #666;
             line-height: 1.3;
             word-wrap: break-word;
@@ -204,16 +236,16 @@
             }
             
             table {
-                font-size: 0.9em;
+                font-size: 0.8em;
             }
             
             th, td {
-                padding: 10px 8px;
+                padding: 8px 4px;
             }
             
             .apartments-list {
-                max-width: 250px;
-                font-size: 0.75em;
+                max-width: 150px;
+                font-size: 0.7em;
             }
         }
     </style>
@@ -221,6 +253,19 @@
 <body>
     <div class="container">
         <h1>📊 Генератор статистики голосования</h1>
+        
+        <div class="format-info">
+            <h3>📋 Формат входного файла</h3>
+            <p>Файл должен содержать две колонки, разделенные табуляцией:</p>
+            <div class="format-example">
+Колонка 1 (НЕ ГОЛОСОВАЛИ)	Колонка 2 (ГОЛОСОВАЛИ)
+1	2
+10	3
+100	4
+...	...
+            </div>
+            <p><strong>Примечание:</strong> Квартиры, которых нет ни в одной колонке, будут считаться как "Нет в данных Росреестра"</p>
+        </div>
         
         <div class="upload-area" id="uploadArea">
             <h3>Перетащите файл сюда или нажмите для выбора</h3>
@@ -238,7 +283,9 @@
         <div class="stats-summary" id="statsSummary">
             <h2>Общая статистика на <span id="currentDate"></span></h2>
             <p><strong>Всего квартир:</strong> <span id="totalApartments">599</span></p>
+            <p><strong>Голосовали:</strong> <span id="votingCount">0</span> квартир</p>
             <p><strong>Не голосовали:</strong> <span id="nonVotingCount">0</span> квартир</p>
+            <p><strong>Нет в данных Росреестра:</strong> <span id="noDataCount">0</span> квартир</p>
             <p><strong>Общая явка:</strong> <span id="overallTurnout">0%</span></p>
         </div>
         
@@ -248,11 +295,16 @@
                     <th>Подъезд</th>
                     <th>Диапазон квартир</th>
                     <th>Всего квартир</th>
+                    <th>Голосовали</th>
                     <th>Не голосовали</th>
+                    <th>Нет в Росреестре</th>
                     <th>Явка (%)</th>
                     <th>Не явились (%)</th>
+                    <th>Нет данных (%)</th>
                     <th>Визуализация</th>
-                    <th>Квартиры, НЕ ГОЛОСОВАВШИЕ</th>
+                    <th>НЕ ГОЛОСОВАВШИЕ</th>
+                    <th>ГОЛОСОВАВШИЕ</th>
+                    <th>НЕТ В ДАННЫХ</th>
                 </tr>
             </thead>
             <tbody id="tableBody">
@@ -350,72 +402,112 @@
             reader.readAsText(file, 'utf-8');
         }
 
+        function getAllApartmentNumbers() {
+            const allApartments = [];
+            for (let entrance = 1; entrance <= 12; entrance++) {
+                for (let apt = entrances[entrance].min; apt <= entrances[entrance].max; apt++) {
+                    allApartments.push(apt);
+                }
+            }
+            return allApartments;
+        }
+
         function processData(fileContent) {
             const lines = fileContent.trim().split('\n');
-            const apartmentData = {};
+            const nonVotingApartments = new Set();
+            const votingApartments = new Set();
 
             lines.forEach(line => {
-                const cleanLine = line.trim();
-                if (!cleanLine) return;
+                const columns = line.split('\t');
                 
-                let number, mark = '';
-                if (cleanLine.includes('д')) {
-                    number = parseInt(cleanLine.replace(/\s*д\s*/g, ''));
-                    mark = ' (д)';
-                } else {
-                    number = parseInt(cleanLine);
+                // Первая колонка - не голосовали
+                if (columns[0] && columns[0].trim()) {
+                    const cleanLine = columns[0].trim();
+                    const number = parseInt(cleanLine.replace(/\s*д\s*/g, ''));
+                    if (!isNaN(number)) {
+                        nonVotingApartments.add(number);
+                    }
                 }
                 
-                if (!isNaN(number)) {
-                    if (!apartmentData[number]) {
-                        apartmentData[number] = mark;
-                    } else if (mark && !apartmentData[number].includes('д')) {
-                        apartmentData[number] = mark;
+                // Вторая колонка - голосовали
+                if (columns[1] && columns[1].trim()) {
+                    const cleanLine = columns[1].trim();
+                    const number = parseInt(cleanLine.replace(/\s*д\s*/g, ''));
+                    if (!isNaN(number)) {
+                        votingApartments.add(number);
                     }
                 }
             });
 
-            const apartmentNumbers = Object.keys(apartmentData).map(num => parseInt(num)).sort((a, b) => a - b);
+            // Получаем все возможные номера квартир
+            const allApartments = getAllApartmentNumbers();
+            const noDataApartments = new Set();
+
+            // Квартиры, которых нет ни в одной колонке
+            allApartments.forEach(apt => {
+                if (!nonVotingApartments.has(apt) && !votingApartments.has(apt)) {
+                    noDataApartments.add(apt);
+                }
+            });
 
             // Group apartments by entrance
             const entranceData = {};
             for (let i = 1; i <= 12; i++) {
                 entranceData[i] = {
                     totalApartments: entrances[i].max - entrances[i].min + 1,
+                    votingApartments: [],
                     nonVotingApartments: [],
-                    nonVotingCount: 0
+                    noDataApartments: [],
+                    votingCount: 0,
+                    nonVotingCount: 0,
+                    noDataCount: 0
                 };
             }
 
-            apartmentNumbers.forEach(apt => {
-                for (let entrance = 1; entrance <= 12; entrance++) {
-                    if (apt >= entrances[entrance].min && apt <= entrances[entrance].max) {
-                        const displayText = apt + apartmentData[apt];
-                        entranceData[entrance].nonVotingApartments.push(displayText);
-                        entranceData[entrance].nonVotingCount++;
-                        break;
+            // Распределяем квартиры по подъездам
+            [nonVotingApartments, votingApartments, noDataApartments].forEach((apartmentSet, index) => {
+                apartmentSet.forEach(apt => {
+                    for (let entrance = 1; entrance <= 12; entrance++) {
+                        if (apt >= entrances[entrance].min && apt <= entrances[entrance].max) {
+                            if (index === 0) { // не голосовали
+                                entranceData[entrance].nonVotingApartments.push(apt);
+                                entranceData[entrance].nonVotingCount++;
+                            } else if (index === 1) { // голосовали
+                                entranceData[entrance].votingApartments.push(apt);
+                                entranceData[entrance].votingCount++;
+                            } else { // нет данных
+                                entranceData[entrance].noDataApartments.push(apt);
+                                entranceData[entrance].noDataCount++;
+                            }
+                            break;
+                        }
                     }
-                }
+                });
             });
 
             // Calculate statistics
             for (let i = 1; i <= 12; i++) {
                 const data = entranceData[i];
-                data.votingRate = ((data.totalApartments - data.nonVotingCount) / data.totalApartments * 100).toFixed(1);
+                data.votingRate = (data.votingCount / data.totalApartments * 100).toFixed(1);
                 data.nonVotingRate = (data.nonVotingCount / data.totalApartments * 100).toFixed(1);
+                data.noDataRate = (data.noDataCount / data.totalApartments * 100).toFixed(1);
             }
 
             const totalApartments = Object.values(entranceData).reduce((sum, data) => sum + data.totalApartments, 0);
+            const totalVoting = Object.values(entranceData).reduce((sum, data) => sum + data.votingCount, 0);
             const totalNonVoting = Object.values(entranceData).reduce((sum, data) => sum + data.nonVotingCount, 0);
-            const overallVotingRate = ((totalApartments - totalNonVoting) / totalApartments * 100).toFixed(1);
+            const totalNoData = Object.values(entranceData).reduce((sum, data) => sum + data.noDataCount, 0);
+            const overallVotingRate = (totalVoting / totalApartments * 100).toFixed(1);
 
-            updateDisplay(entranceData, totalApartments, totalNonVoting, overallVotingRate);
+            updateDisplay(entranceData, totalApartments, totalVoting, totalNonVoting, totalNoData, overallVotingRate);
         }
 
-        function updateDisplay(entranceData, totalApartments, totalNonVoting, overallVotingRate) {
+        function updateDisplay(entranceData, totalApartments, totalVoting, totalNonVoting, totalNoData, overallVotingRate) {
             // Update summary
             document.getElementById('totalApartments').textContent = totalApartments;
+            document.getElementById('votingCount').textContent = totalVoting;
             document.getElementById('nonVotingCount').textContent = totalNonVoting;
+            document.getElementById('noDataCount').textContent = totalNoData;
             document.getElementById('overallTurnout').textContent = overallVotingRate + '%';
 
             // Update table
@@ -430,16 +522,22 @@
                     <td class="entrance-number">${i}</td>
                     <td>${entrances[i].min}-${entrances[i].max}</td>
                     <td>${data.totalApartments}</td>
-                    <td>${data.nonVotingCount}</td>
+                    <td class="voting-rate">${data.votingCount}</td>
+                    <td class="non-voting-rate">${data.nonVotingCount}</td>
+                    <td class="no-data-rate">${data.noDataCount}</td>
                     <td class="voting-rate">${data.votingRate}%</td>
                     <td class="non-voting-rate">${data.nonVotingRate}%</td>
+                    <td class="no-data-rate">${data.noDataRate}%</td>
                     <td>
                         <div class="progress-bar">
-                            <div class="progress-voting" style="width: ${data.votingRate}%; float: left;"></div>
-                            <div class="progress-non-voting" style="width: ${data.nonVotingRate}%; float: right;"></div>
+                            <div class="progress-voting" style="width: ${data.votingRate}%;"></div>
+                            <div class="progress-non-voting" style="width: ${data.nonVotingRate}%;"></div>
+                            <div class="progress-no-data" style="width: ${data.noDataRate}%;"></div>
                         </div>
                     </td>
-                    <td class="apartments-list">${data.nonVotingApartments.join(', ')}</td>
+                    <td class="apartments-list">${data.nonVotingApartments.sort((a, b) => a - b).join(', ')}</td>
+                    <td class="apartments-list">${data.votingApartments.sort((a, b) => a - b).join(', ')}</td>
+                    <td class="apartments-list">${data.noDataApartments.sort((a, b) => a - b).join(', ')}</td>
                 `;
                 
                 tableBody.appendChild(row);
@@ -460,6 +558,9 @@
                     <li><strong>Лучшая явка:</strong> ${best.map(item => `Подъезд ${item.entrance} (${item.turnout}%)`).join(', ')}</li>
                     <li><strong>Худшая явка:</strong> ${worst.map(item => `Подъезд ${item.entrance} (${item.turnout}%)`).join(', ')}</li>
                     <li><strong>Средняя явка:</strong> ${overallVotingRate}% по всему дому</li>
+                    <li><strong>Всего голосовало:</strong> ${totalVoting} из ${totalApartments} квартир</li>
+                    <li><strong>Не голосовало:</strong> ${totalNonVoting} квартир</li>
+                    <li><strong>Нет в данных Росреестра:</strong> ${totalNoData} квартир</li>
                     ${needAttention.length > 0 ? `<li><strong>Требует внимания:</strong> ${needAttention.map(item => `Подъезд ${item.entrance}`).join(', ')} с явкой менее 40%</li>` : ''}
                 </ul>
             `;
